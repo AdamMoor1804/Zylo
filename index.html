@@ -93,11 +93,11 @@ const RANKS=[
 
 /* ─── TIER REWARDS unlocked at end of each tier ─── */
 const TIER_REWARDS={
-  bronze:{char:{id:"bronze_knight",name:"Bronze Knight",ico:"🛡️",bg:"#FFF3E0",bdr:"#CD7F32",desc:"Tier reward!"},bg:{id:"bg_bronze",name:"Bronze Forge",col:"#FFF3E0",hdr:"#FFE0B2",bdr:"#FFCC80",acc:"#CD7F32",dark:false,ico:"🔥",desc:"Bronze tier reward!"},triggerRank:"Bronze 3"},
-  silver:{char:{id:"silver_star",name:"Silver Star",ico:"⭐",bg:"#F5F5F5",bdr:"#9E9E9E",desc:"Tier reward!"},bg:{id:"bg_silver",name:"Silver Storm",col:"#F5F5F5",hdr:"#E8E8E8",bdr:"#BDBDBD",acc:"#757575",dark:false,ico:"⚡",desc:"Silver tier reward!"},triggerRank:"Silver 3"},
+  bronze:{char:{id:"bronze_knight",name:"Bronze Knight",ico:"🛡",bg:"#FFF3E0",bdr:"#CD7F32",desc:"Tier reward!"},bg:{id:"bg_bronze",name:"Bronze Forge",col:"#FFF3E0",hdr:"#FFE0B2",bdr:"#FFCC80",acc:"#CD7F32",dark:false,ico:"🔥",desc:"Bronze tier reward!"},triggerRank:"Bronze 3"},
+  silver:{char:{id:"silver_star",name:"Silver Star",ico:"🌠",bg:"#F5F5F5",bdr:"#9E9E9E",desc:"Tier reward!"},bg:{id:"bg_silver",name:"Silver Storm",col:"#F5F5F5",hdr:"#E8E8E8",bdr:"#BDBDBD",acc:"#757575",dark:false,ico:"⚡",desc:"Silver tier reward!"},triggerRank:"Silver 3"},
   gold:{char:{id:"gold_crown",name:"Gold Champion",ico:"👑",bg:"#FFFDE7",bdr:"#F9A825",desc:"Tier reward!"},bg:{id:"bg_gold",name:"Golden Hour",col:"#FFFDE7",hdr:"#FFF9C4",bdr:"#FFE082",acc:"#F9A825",dark:false,ico:"🌟",desc:"Gold tier reward!"},triggerRank:"Gold 3"},
   plat:{char:{id:"plat_crystal",name:"Crystal Lord",ico:"💎",bg:"#E0F7FA",bdr:"#00ACC1",desc:"Tier reward!"},bg:{id:"bg_plat",name:"Platinum Ice",col:"#E0F7FA",hdr:"#B2EBF2",bdr:"#80DEEA",acc:"#00ACC1",dark:false,ico:"❄️",desc:"Platinum tier reward!"},triggerRank:"Platinum 3"},
-  diamond:{char:{id:"diamond_sage",name:"Diamond Sage",ico:"🌀",bg:"#E3F2FD",bdr:"#1565C0",desc:"Tier reward!"},bg:{id:"bg_diamond",name:"Diamond Sky",col:"#E3F2FD",hdr:"#BBDEFB",bdr:"#90CAF9",acc:"#1565C0",dark:false,ico:"💠",desc:"Diamond tier reward!"},triggerRank:"Diamond 3"},
+  diamond:{char:{id:"diamond_sage",name:"Diamond Sage",ico:"🔷",bg:"#E3F2FD",bdr:"#1565C0",desc:"Tier reward!"},bg:{id:"bg_diamond",name:"Diamond Sky",col:"#E3F2FD",hdr:"#BBDEFB",bdr:"#90CAF9",acc:"#1565C0",dark:false,ico:"💠",desc:"Diamond tier reward!"},triggerRank:"Diamond 3"},
   champ:{char:{id:"champ_legend",name:"The Legend",ico:"🏆",bg:"#FFEBEE",bdr:"#C62828",desc:"Champion reward!"},bg:{id:"bg_champ",name:"Champion's Glory",col:"#FFEBEE",hdr:"#FFCDD2",bdr:"#EF9A9A",acc:"#C62828",dark:false,ico:"🔱",desc:"Champion reward!"},triggerRank:"Champion"},
 };
 
@@ -268,6 +268,41 @@ const clearIncomingRequest = async (toUsername, fromUsername) => {
   await fbRef("incomingRequests/" + toUsername.toLowerCase() + "/" + fromUsername.toLowerCase()).remove();
 };
 
+// Friend challenge helpers
+const sendChallenge = async (fromUser, fromData, toUsername, task, reward) => {
+  const to = toUsername.toLowerCase();
+  const chalData = {
+    id: Date.now(),
+    from: fromUser.toLowerCase(),
+    fromDisplay: fromData.displayName || fromUser,
+    fromAvatar: fromData.avatar || "🦉",
+    task,
+    reward,
+    sentAt: Date.now(),
+  };
+  await fbRef("challenges/" + to + "/" + chalData.id).set(chalData);
+};
+
+const syncChallenges = async (username) => {
+  const snap = await fbRef("challenges/" + username.toLowerCase()).get();
+  if (!snap.exists()) return [];
+  return Object.values(snap.val());
+};
+
+const resolveChallenge = async (challengeId, receiverUsername, challengerUsername, reward, accept) => {
+  // Remove challenge node
+  await fbRef("challenges/" + receiverUsername.toLowerCase() + "/" + challengeId).remove();
+  if (accept) {
+    // Deduct coins from challenger, add to receiver
+    const snap = await fbRef("profiles/" + challengerUsername.toLowerCase()).get();
+    if (snap.exists()) {
+      const data = snap.val();
+      const newCoins = Math.max(0, (data.coins || 0) - reward);
+      await fbRef("profiles/" + challengerUsername.toLowerCase() + "/coins").set(newCoins);
+    }
+  }
+};
+
 // Password stored in Firebase (hashed) so login works on any device
 const savePassword = async (username, pw) => {
   await fbRef("passwords/" + username.toLowerCase()).set(String(hashStr(pw + username.toLowerCase())));
@@ -291,7 +326,7 @@ const DEF={
   username:"",avatar:"🦉",displayName:"",claimedMS:[],
   streakFreezes:0,xpBoost:0,xpCapBonuses:0,
   dailyXpEarned:0,dailyXpDate:"",
-  friends:[],pendingRequests:[],incomingRequests:[],
+  friends:[],pendingRequests:[],incomingRequests:[],challenges:[],
   claimedTierRewards:[],
   dailyQuestDate:"",dailyQuestsDone:[],
 };
@@ -578,6 +613,10 @@ function App(){
   const[dueDate,setDueDate]=useState("");
   const[dueTime,setDueTime]=useState("");
   const[sellItem,setSellItem]=useState(null);
+  const[showChallengeModal,setShowChallengeModal]=useState(false);
+  const[challengeTarget,setChallengeTarget]=useState(null);
+  const[challengeTask,setChallengeTask]=useState("");
+  const[challengeReward,setChallengeReward]=useState(50);
   const[now,setNow]=useState(Date.now());
   const tRef=useRef(null);
   const timerRef=useRef(null);
@@ -621,7 +660,8 @@ function App(){
     const ownedC=merged.ownedChar||["owl"];
     const safeChar=ownedC.includes(merged.equippedChar)?merged.equippedChar:"owl";
     const freshReqs=await syncIncomingRequests(username);
-    const withRequests={...merged,equippedChar:safeChar,incomingRequests:freshReqs};
+    const freshChals=await syncChallenges(username);
+    const withRequests={...merged,equippedChar:safeChar,incomingRequests:freshReqs,challenges:freshChals};
     setS(withRequests);
     setShowSplash(true);
     setTimeout(()=>{setShowSplash(false);setReady(true);},2800);
@@ -847,9 +887,11 @@ function App(){
   };
   const syncRequests=async()=>{
     const fresh=await syncIncomingRequests(currentUser);
-    if(JSON.stringify(fresh)!==JSON.stringify(s.incomingRequests||[])){
-      upd({incomingRequests:fresh});
-    }
+    const freshChals=await syncChallenges(currentUser);
+    const patch={};
+    if(JSON.stringify(fresh)!==JSON.stringify(s.incomingRequests||[]))patch.incomingRequests=fresh;
+    if(JSON.stringify(freshChals)!==JSON.stringify(s.challenges||[]))patch.challenges=freshChals;
+    if(Object.keys(patch).length>0)upd(patch);
   };
 
   const searchFriend=async()=>{
@@ -917,6 +959,38 @@ function App(){
     </div>}
 
     {/* Streak modal */}
+    {showChallengeModal&&challengeTarget&&<div className="ov" onClick={e=>e.target===e.currentTarget&&setShowChallengeModal(false)}>
+      <div className="box" style={{border:"2px solid #5FA0E0",maxHeight:"85vh",overflowY:"auto"}}>
+        <div style={{fontSize:36,textAlign:"center",marginBottom:6}}>🎯</div>
+        <div style={{fontSize:17,fontWeight:900,color:"#1A1A2E",textAlign:"center",marginBottom:4}}>Challenge a Friend!</div>
+        <div style={{textAlign:"center",fontSize:12,fontWeight:700,color:"#888",marginBottom:14}}>
+          Challenging <strong style={{color:"#5FA0E0"}}>{challengeTarget.displayName||challengeTarget.username}</strong>
+        </div>
+        <div style={{fontSize:10,fontWeight:800,color:"#AAA",letterSpacing:".8px",marginBottom:5}}>TASK FOR THEM TO COMPLETE</div>
+        <textarea value={challengeTask} onChange={e=>setChallengeTask(e.target.value)} placeholder="e.g. Clean the dishes, do 20 push-ups..." maxLength={80} rows={2}
+          style={{width:"100%",border:"2px solid #D0E4F5",borderRadius:12,padding:"9px 12px",fontFamily:"Nunito,sans-serif",fontSize:13,fontWeight:700,outline:"none",color:"#333",background:"#fff",resize:"none",marginBottom:12,boxSizing:"border-box"}}/>
+        <div style={{fontSize:10,fontWeight:800,color:"#AAA",letterSpacing:".8px",marginBottom:5}}>YOUR COIN REWARD ({s.coins} available)</div>
+        <div style={{display:"flex",gap:8,marginBottom:6}}>
+          {[25,50,100,200].map(amt=><button key={amt} onClick={()=>setChallengeReward(amt)} style={{flex:1,padding:"8px 0",border:`2px solid ${challengeReward===amt?"#5FA0E0":"#E0E0E0"}`,borderRadius:10,fontFamily:"Nunito,sans-serif",fontWeight:800,fontSize:12,background:challengeReward===amt?"#E8F3FF":"#fff",color:challengeReward===amt?"#5FA0E0":"#888",cursor:"pointer"}}>🪙{amt}</button>)}
+        </div>
+        <input type="number" value={challengeReward} onChange={e=>setChallengeReward(Math.max(1,Math.min(s.coins,parseInt(e.target.value)||0)))} min={1} max={s.coins}
+          style={{width:"100%",border:"2px solid #D0E4F5",borderRadius:10,padding:"7px 12px",fontFamily:"Nunito,sans-serif",fontSize:13,fontWeight:700,outline:"none",color:"#333",marginBottom:14,boxSizing:"border-box"}}/>
+        {challengeReward>s.coins&&<div style={{background:"#FFF0F0",border:"2px solid #FFCDD2",borderRadius:10,padding:"7px",fontSize:11,fontWeight:700,color:"#C62828",marginBottom:10,textAlign:"center"}}>Not enough coins!</div>}
+        <div style={{background:"#E8F3FF",border:"2px solid #A0C8F0",borderRadius:12,padding:"10px 12px",fontSize:11,fontWeight:700,color:"#1565C0",marginBottom:14}}>
+          ✅ If they complete it, you pay them <strong>🪙{challengeReward}</strong> coins.<br/>
+          ❌ If they decline, no coins are charged.
+        </div>
+        <div style={{display:"flex",gap:8}}>
+          <button onClick={()=>setShowChallengeModal(false)} style={{flex:1,padding:"10px",border:"2px solid #E0E0E0",borderRadius:12,fontFamily:"Nunito,sans-serif",fontWeight:800,fontSize:13,background:"#fff",color:"#888",cursor:"pointer"}}>Cancel</button>
+          <button disabled={!challengeTask.trim()||challengeReward<1||challengeReward>s.coins} onClick={async()=>{
+            await sendChallenge(currentUser,s,challengeTarget.username,challengeTask.trim(),challengeReward);
+            showToast(`Challenge sent to ${challengeTarget.displayName||challengeTarget.username}! 🎯`);
+            setShowChallengeModal(false);setChallengeTask("");setChallengeReward(50);
+          }} style={{flex:1,padding:"10px",border:"none",borderRadius:12,fontFamily:"Nunito,sans-serif",fontWeight:900,fontSize:13,background:(!challengeTask.trim()||challengeReward<1||challengeReward>s.coins)?"#E0E0E0":"#5FA0E0",color:(!challengeTask.trim()||challengeReward<1||challengeReward>s.coins)?"#BBB":"#fff",cursor:"pointer"}}>Send! 🎯</button>
+        </div>
+      </div>
+    </div>}
+
     {confirmUnfriend&&<div className="ov" onClick={()=>setConfirmUnfriend(null)}>
       <div className="box" style={{border:"2px solid #FFCDD2",textAlign:"center"}}>
         <div style={{fontSize:44,marginBottom:10}}>🤔</div>
@@ -1180,9 +1254,44 @@ function App(){
               <FriendCard friend={f} tc={tc} tc2={tc2} cardBg={cardBg} cardBdr={cardBdr}/>
               <div style={{display:"flex",gap:6,marginTop:-4,marginBottom:8,paddingLeft:4}}>
                 <button onClick={()=>{(async()=>{const fresh=await getUserFromDb(f.username);if(fresh)upd({friends:s.friends.map(x=>x.username===f.username?fresh:x)});})();}} style={{fontSize:10,fontWeight:800,color:"#5FA0E0",background:"#E8F3FF",border:"1.5px solid #A0C8F0",borderRadius:8,padding:"3px 9px",cursor:"pointer",fontFamily:"Nunito,sans-serif"}}>↻ Refresh</button>
+                <button onClick={()=>{setChallengeTarget(f);setChallengeTask("");setChallengeReward(50);setShowChallengeModal(true);}} style={{fontSize:10,fontWeight:800,color:"#FF8C00",background:"#FFF3E0",border:"1.5px solid #FFCC80",borderRadius:8,padding:"3px 9px",cursor:"pointer",fontFamily:"Nunito,sans-serif"}}>🎯 Challenge</button>
                 <button onClick={()=>setConfirmUnfriend(f.username)} style={{fontSize:10,fontWeight:800,color:"#E53935",background:"#FFEBEE",border:"1.5px solid #FFCDD2",borderRadius:8,padding:"3px 9px",cursor:"pointer",fontFamily:"Nunito,sans-serif"}}>Remove</button>
               </div>
             </div>)}
+
+          {/* ─── INCOMING CHALLENGES ─── */}
+          {(s.challenges||[]).length>0&&<>
+            <div style={{height:1,background:cardBdr,margin:"4px 0 12px"}}/>
+            <div style={{fontWeight:900,fontSize:14,color:tc,marginBottom:8,display:"flex",alignItems:"center",gap:8}}>
+              🎯 Challenges for You
+              <span style={{background:"#FF8C00",color:"#fff",borderRadius:20,padding:"2px 9px",fontSize:11,fontWeight:800}}>{(s.challenges||[]).length}</span>
+            </div>
+            {(s.challenges||[]).map(chal=><div key={chal.id} style={{background:cardBg,border:`2px solid #FFCC80`,borderRadius:18,padding:"13px 14px",marginBottom:10}}>
+              <div style={{display:"flex",alignItems:"center",gap:10,marginBottom:8}}>
+                <div style={{width:38,height:38,borderRadius:"50%",background:"#FFF3E0",border:"2px solid #FF8C00",display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{chal.fromAvatar||"🦉"}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:12,color:tc}}>{chal.fromDisplay||chal.from} challenged you!</div>
+                  <div style={{fontSize:10,color:"#FF8C00",fontWeight:800,marginTop:1}}>Reward: 🪙 {chal.reward} coins</div>
+                </div>
+              </div>
+              <div style={{background:"#FFF8E8",border:"1.5px solid #FFE0A0",borderRadius:10,padding:"8px 11px",fontSize:12,fontWeight:700,color:"#333",marginBottom:10}}>
+                📋 {chal.task}
+              </div>
+              <div style={{display:"flex",gap:7}}>
+                <button onClick={async()=>{
+                  await resolveChallenge(chal.id,currentUser,chal.from,chal.reward,true);
+                  const newCoins=s.coins+chal.reward;
+                  upd({coins:newCoins,challenges:(s.challenges||[]).filter(c=>c.id!==chal.id)});
+                  showToast(`+🪙${chal.reward} coins! Challenge complete! 🎉`);
+                }} style={{flex:1,padding:"9px",border:"none",borderRadius:11,fontFamily:"Nunito,sans-serif",fontWeight:900,fontSize:12,background:"#5FA0E0",color:"#fff",cursor:"pointer",boxShadow:"0 2px 0 #4A8CC8"}}>✅ Done! (+🪙{chal.reward})</button>
+                <button onClick={async()=>{
+                  await resolveChallenge(chal.id,currentUser,chal.from,chal.reward,false);
+                  upd({challenges:(s.challenges||[]).filter(c=>c.id!==chal.id)});
+                  showToast("Challenge declined");
+                }} style={{padding:"9px 13px",border:"2px solid #FFCDD2",borderRadius:11,fontFamily:"Nunito,sans-serif",fontWeight:800,fontSize:12,background:"#FFF0F0",color:"#E53935",cursor:"pointer"}}>✗ Decline</button>
+              </div>
+            </div>)}
+          </>}
         </>}
 
         {tab==="shop"&&<>
@@ -1195,14 +1304,33 @@ function App(){
           <div style={{display:"flex",gap:5,marginBottom:12}}>
             {[{id:"chars",l:"🦉 Characters"},{id:"bgs",l:"🎨 Themes"},{id:"frames",l:"🖼 Frames"},{id:"util",l:"⚡ Power-Ups"}].map(t=><button key={t.id} onClick={()=>setShopTab(t.id)} style={{flex:1,padding:"7px 2px",border:`2px solid ${shopTab===t.id?"#5FA0E0":"#E0EAFA"}`,borderRadius:14,fontFamily:"Nunito,sans-serif",fontSize:9,fontWeight:800,cursor:"pointer",color:shopTab===t.id?"#5FA0E0":tc2,background:shopTab===t.id?(dk?"#1A2030":"#E8F3FF"):(dk?"#16162A":"#FAFCFF"),transition:"all .15s"}}>{t.l}</button>)}
           </div>
-          {shopTab==="chars"&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
-            {CHARS.map(c=>{
-              const owned=s.ownedChar.includes(c.id);
-              const canAfford=s.coins>=c.price;
-              const isTierLocked=c.tierReward&&!owned;
-              return <ShopCard key={c.id} item={c} cat="chars" isEq={s.equippedChar===c.id} owned={owned} canAfford={canAfford} {...th} onClick={()=>{if(isTierLocked){showToast("Unlock by reaching that rank! 🏆");return;}if(!owned&&!canAfford&&!c.tierReward){showToast("Not enough coins! 🔒");return;}requestBuy(c,"chars");}} onSell={owned&&c.price>0&&!c.tierReward?()=>setSellItem({item:c,cat:"chars"}):null}/>;
-            })}
-          </div>}
+          {shopTab==="chars"&&<>
+            <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10,marginBottom:12}}>
+              {BASE_CHARS.map(c=>{
+                const owned=s.ownedChar.includes(c.id);
+                const canAfford=s.coins>=c.price;
+                return <ShopCard key={c.id} item={c} cat="chars" isEq={s.equippedChar===c.id} owned={owned} canAfford={canAfford} {...th} onClick={()=>{if(!owned&&!canAfford){showToast("Not enough coins! 🔒");return;}requestBuy(c,"chars");}} onSell={owned&&c.price>0?()=>setSellItem({item:c,cat:"chars"}):null}/>;
+              })}
+            </div>
+            <div style={{background:dk?"#1A2030":"#FFF8E8",border:`2px solid #FFCC80`,borderRadius:16,padding:"10px 14px",marginBottom:10}}>
+              <div style={{fontWeight:900,fontSize:13,color:"#E65100",marginBottom:4}}>🏆 Tier Reward Characters</div>
+              <div style={{fontSize:11,fontWeight:600,color:"#888",marginBottom:10}}>Reach the milestone rank to unlock these exclusive characters!</div>
+              <div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
+                {TIER_CHARS.map(c=>{
+                  const owned=s.ownedChar.includes(c.id);
+                  const triggerRank=Object.values(TIER_REWARDS).find(r=>r.char.id===c.id)?.triggerRank||"";
+                  return <div key={c.id} style={{background:owned?c.bg:(dk?"#1C1A14":"#FFFBF0"),border:`2px solid ${owned?"#F9A825":"#FFE0A0"}`,borderRadius:16,padding:"12px 8px",textAlign:"center",position:"relative",opacity:owned?1:0.75}}>
+                    {!owned&&<div style={{position:"absolute",top:6,right:6,background:"#F9A825",borderRadius:8,padding:"2px 7px",fontSize:9,fontWeight:900,color:"#fff"}}>LOCKED</div>}
+                    {owned&&<div style={{position:"absolute",top:6,right:6,background:"#4CAF50",borderRadius:8,padding:"2px 7px",fontSize:9,fontWeight:900,color:"#fff"}}>OWNED</div>}
+                    <div style={{width:52,height:52,borderRadius:14,background:c.bg,border:`2.5px solid ${c.bdr}`,margin:"0 auto 8px",display:"flex",alignItems:"center",justifyContent:"center",fontSize:28}}>{c.ico}</div>
+                    <div style={{fontWeight:800,fontSize:12,color:dk?"#E0D8C0":"#333"}}>{c.name}</div>
+                    <div style={{fontSize:9,fontWeight:700,color:"#F9A825",marginTop:2}}>Reach: {triggerRank}</div>
+                    {owned&&<div onClick={()=>requestBuy(c,"chars")} style={{marginTop:7,borderRadius:9,padding:"6px",fontSize:10,fontWeight:800,background:s.equippedChar===c.id?"#5FA0E0":"#DBEAFE",color:s.equippedChar===c.id?"#fff":"#1D4ED8",cursor:"pointer"}}>{s.equippedChar===c.id?"✓ Equipped":"Equip"}</div>}
+                  </div>;
+                })}
+              </div>
+            </div>
+          </>}
           {shopTab==="bgs"&&<div style={{display:"grid",gridTemplateColumns:"repeat(2,1fr)",gap:10}}>
             {BGS.map(c=>{
               const owned=s.ownedBg.includes(c.id);
