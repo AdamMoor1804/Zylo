@@ -105,23 +105,23 @@ const AVATARS=["🦉","😎","🔥","🚀","🥷","🦄","🤖","👑","🐉","�
 
 const BASE_CHARS=[
   {id:"owl",name:"Owlie",price:0,bg:"#E8F5E9",bdr:"#58CC02",ico:"🦉",desc:"Your quest buddy!"},
-  {id:"frog",name:"Froggo",price:80,bg:"#E8F5E9",bdr:"#43A047",ico:"🐸",desc:"Ribbit! 🐸"},
-  {id:"cool",name:"Cool Kid",price:100,bg:"#E8F3FF",bdr:"#5FA0E0",ico:"😎",desc:"Way too cool 😏"},
-  {id:"tiger",name:"Tigzr",price:120,bg:"#FFF3E0",bdr:"#EF6C00",ico:"🐯",desc:"Rawr means yes!"},
-  {id:"fire",name:"Inferno",price:150,bg:"#FFF8E1",bdr:"#FF6D00",ico:"🔥",desc:"ON FIRE! 🔥"},
-  {id:"eagle",name:"Eagle",price:180,bg:"#E3F2FD",bdr:"#1565C0",ico:"🦅",desc:"Soaring high!"},
-  {id:"space",name:"Astro",price:200,bg:"#EDE7F6",bdr:"#7C3AED",ico:"🚀",desc:"3...2...1... 🚀"},
-  {id:"shark",name:"Sharky",price:220,bg:"#E3F2FD",bdr:"#0277BD",ico:"🦈",desc:"Chomping tasks!"},
-  {id:"ninja",name:"Shadow",price:250,bg:"#F3E5F5",bdr:"#AB47BC",ico:"🥷",desc:"You can't see me"},
-  {id:"fox",name:"Foxxy",price:280,bg:"#FFF3E0",bdr:"#E65100",ico:"🦊",desc:"Sly & clever 🦊"},
-  {id:"uni",name:"Unicorn",price:300,bg:"#FCE4EC",bdr:"#EC4899",ico:"🦄",desc:"Pure magic ✨"},
-  {id:"dino",name:"Dino-Rex",price:320,bg:"#E8F5E9",bdr:"#2E7D32",ico:"🦖",desc:"RAWR! 🦖"},
-  {id:"robot",name:"R0-B0T",price:350,bg:"#E0F2F1",bdr:"#26A69A",ico:"🤖",desc:"BEEP BOOP 🤖"},
-  {id:"butterfly",name:"Flutter",price:380,bg:"#FCE4EC",bdr:"#E91E63",ico:"🦋",desc:"Beautiful! 🦋"},
-  {id:"wolf",name:"Alpha",price:450,bg:"#E8EAF6",bdr:"#3949AB",ico:"🐺",desc:"Lead the pack"},
-  {id:"dolphin",name:"Splash",price:480,bg:"#E3F2FD",bdr:"#0288D1",ico:"🐬",desc:"Smart & speedy!"},
-  {id:"crown",name:"Royale",price:500,bg:"#FFFDE7",bdr:"#F9A825",ico:"👑",desc:"Born to rule"},
-  {id:"drag",name:"Drago",price:600,bg:"#F3E5F5",bdr:"#9C27B0",ico:"🐉",desc:"LEGENDARY 🐉"},
+  {id:"frog",name:"Froggo",price:240,bg:"#E8F5E9",bdr:"#43A047",ico:"🐸",desc:"Ribbit! 🐸"},
+  {id:"cool",name:"Cool Kid",price:300,bg:"#E8F3FF",bdr:"#5FA0E0",ico:"😎",desc:"Way too cool 😏"},
+  {id:"tiger",name:"Tigzr",price:360,bg:"#FFF3E0",bdr:"#EF6C00",ico:"🐯",desc:"Rawr means yes!"},
+  {id:"fire",name:"Inferno",price:450,bg:"#FFF8E1",bdr:"#FF6D00",ico:"🔥",desc:"ON FIRE! 🔥"},
+  {id:"eagle",name:"Eagle",price:540,bg:"#E3F2FD",bdr:"#1565C0",ico:"🦅",desc:"Soaring high!"},
+  {id:"space",name:"Astro",price:600,bg:"#EDE7F6",bdr:"#7C3AED",ico:"🚀",desc:"3...2...1... 🚀"},
+  {id:"shark",name:"Sharky",price:660,bg:"#E3F2FD",bdr:"#0277BD",ico:"🦈",desc:"Chomping tasks!"},
+  {id:"ninja",name:"Shadow",price:750,bg:"#F3E5F5",bdr:"#AB47BC",ico:"🥷",desc:"You can't see me"},
+  {id:"fox",name:"Foxxy",price:840,bg:"#FFF3E0",bdr:"#E65100",ico:"🦊",desc:"Sly & clever 🦊"},
+  {id:"uni",name:"Unicorn",price:900,bg:"#FCE4EC",bdr:"#EC4899",ico:"🦄",desc:"Pure magic ✨"},
+  {id:"dino",name:"Dino-Rex",price:960,bg:"#E8F5E9",bdr:"#2E7D32",ico:"🦖",desc:"RAWR! 🦖"},
+  {id:"robot",name:"R0-B0T",price:1050,bg:"#E0F2F1",bdr:"#26A69A",ico:"🤖",desc:"BEEP BOOP 🤖"},
+  {id:"butterfly",name:"Flutter",price:1140,bg:"#FCE4EC",bdr:"#E91E63",ico:"🦋",desc:"Beautiful! 🦋"},
+  {id:"wolf",name:"Alpha",price:1350,bg:"#E8EAF6",bdr:"#3949AB",ico:"🐺",desc:"Lead the pack"},
+  {id:"dolphin",name:"Splash",price:1440,bg:"#E3F2FD",bdr:"#0288D1",ico:"🐬",desc:"Smart & speedy!"},
+  {id:"crown",name:"Royale",price:1500,bg:"#FFFDE7",bdr:"#F9A825",ico:"👑",desc:"Born to rule"},
+  {id:"drag",name:"Drago",price:1800,bg:"#F3E5F5",bdr:"#9C27B0",ico:"🐉",desc:"LEGENDARY 🐉"},
 ];
 
 const TIER_CHARS=Object.values(TIER_REWARDS).map(r=>({...r.char,price:0,tierReward:true}));
@@ -130,27 +130,27 @@ const CHARS=[...BASE_CHARS,...TIER_CHARS];
 const BASE_BGS=[
   {id:"bg_light",name:"Light Mode",price:0,col:"#F4F8FF",hdr:"#E8F3FF",bdr:"#C8DCF5",acc:"#5FA0E0",dark:false,ico:"☀️",desc:"Clean & bright — FREE!"},
   {id:"bg_dark",name:"Dark Mode",price:0,col:"#0F0F1C",hdr:"#141422",bdr:"#26263A",acc:"#5FA0E0",dark:true,ico:"🌙",desc:"Sleek dark — FREE!"},
-  {id:"bg_sky",name:"Sky Blue",price:60,col:"#EBF5FF",hdr:"#D4EAFF",bdr:"#A0C8F0",acc:"#1976D2",dark:false,ico:"🌤️",desc:"Clear sky vibes"},
-  {id:"bg_mint",name:"Minty",price:60,col:"#ECFBF1",hdr:"#D1F5DF",bdr:"#96E6B4",acc:"#2E7D32",dark:false,ico:"🌿",desc:"Cool & fresh"},
-  {id:"bg_candy",name:"Candy",price:80,col:"#FFF0F8",hdr:"#FFD5EF",bdr:"#FFB0D8",acc:"#E91E63",dark:false,ico:"🍭",desc:"Super sweet!"},
-  {id:"bg_sun",name:"Sunny",price:80,col:"#FFFCE5",hdr:"#FFF5B0",bdr:"#FFE860",acc:"#F9A825",dark:false,ico:"🌻",desc:"Happy & warm"},
-  {id:"bg_grape",name:"Grape",price:150,col:"#F5EDFF",hdr:"#E5D0FF",bdr:"#C9A0F5",acc:"#7C3AED",dark:false,ico:"🍇",desc:"Dreamy vibes"},
-  {id:"bg_ocean",name:"Deep Ocean",price:150,col:"#E8F4FF",hdr:"#D0E8FF",bdr:"#90C0F0",acc:"#0277BD",dark:false,ico:"🌊",desc:"Ocean breeze"},
-  {id:"bg_space",name:"Starry Night",price:200,col:"#060A18",hdr:"#0B1128",bdr:"#15203E",acc:"#60A5FA",dark:true,ico:"🌌",desc:"A starry night sky",starry:true},
+  {id:"bg_sky",name:"Sky Blue",price:180,col:"#EBF5FF",hdr:"#D4EAFF",bdr:"#A0C8F0",acc:"#1976D2",dark:false,ico:"🌤️",desc:"Clear sky vibes"},
+  {id:"bg_mint",name:"Minty",price:180,col:"#ECFBF1",hdr:"#D1F5DF",bdr:"#96E6B4",acc:"#2E7D32",dark:false,ico:"🌿",desc:"Cool & fresh"},
+  {id:"bg_candy",name:"Candy",price:240,col:"#FFF0F8",hdr:"#FFD5EF",bdr:"#FFB0D8",acc:"#E91E63",dark:false,ico:"🍭",desc:"Super sweet!"},
+  {id:"bg_sun",name:"Sunny",price:240,col:"#FFFCE5",hdr:"#FFF5B0",bdr:"#FFE860",acc:"#F9A825",dark:false,ico:"🌻",desc:"Happy & warm"},
+  {id:"bg_grape",name:"Grape",price:450,col:"#F5EDFF",hdr:"#E5D0FF",bdr:"#C9A0F5",acc:"#7C3AED",dark:false,ico:"🍇",desc:"Dreamy vibes"},
+  {id:"bg_ocean",name:"Deep Ocean",price:450,col:"#E8F4FF",hdr:"#D0E8FF",bdr:"#90C0F0",acc:"#0277BD",dark:false,ico:"🌊",desc:"Ocean breeze"},
+  {id:"bg_space",name:"Starry Night",price:600,col:"#060A18",hdr:"#0B1128",bdr:"#15203E",acc:"#60A5FA",dark:true,ico:"🌌",desc:"A starry night sky",starry:true},
 ];
 const TIER_BGS=Object.values(TIER_REWARDS).map(r=>({...r.bg,price:0,tierReward:true}));
 const BGS=[...BASE_BGS,...TIER_BGS];
 
 const FRAMES=[
   {id:"fr_none",name:"No Frame",price:0,col:"transparent",ico:"⭕",desc:"Clean look"},
-  {id:"fr_blue",name:"Zylo Blue",price:100,col:"#5FA0E0",ico:"🔵",desc:"The Zylo classic!"},
-  {id:"fr_green",name:"Lime",price:150,col:"#58CC02",ico:"🟢",desc:"Quest green!"},
-  {id:"fr_gold",name:"Golden",price:300,col:"#F9A825",ico:"🟡",desc:"Shiny!"},
-  {id:"fr_pink",name:"Pinky",price:200,col:"#EC4899",ico:"🌸",desc:"So pretty!"},
-  {id:"fr_fire",name:"Flame",price:350,col:"#FF4500",ico:"🔴",desc:"BLAZING HOT"},
-  {id:"fr_cyan",name:"Neon Cyan",price:250,col:"#00E5FF",ico:"🩵",desc:"Electric!"},
-  {id:"fr_purple",name:"Mystic",price:300,col:"#9C27B0",ico:"💜",desc:"Arcane power"},
-  {id:"fr_rainbow",name:"Rainbow",price:600,col:"rainbow",ico:"🌈",desc:"All the colours!"},
+  {id:"fr_blue",name:"Zylo Blue",price:300,col:"#5FA0E0",ico:"🔵",desc:"The Zylo classic!"},
+  {id:"fr_green",name:"Lime",price:450,col:"#58CC02",ico:"🟢",desc:"Quest green!"},
+  {id:"fr_gold",name:"Golden",price:900,col:"#F9A825",ico:"🟡",desc:"Shiny!"},
+  {id:"fr_pink",name:"Pinky",price:600,col:"#EC4899",ico:"🌸",desc:"So pretty!"},
+  {id:"fr_fire",name:"Flame",price:1050,col:"#FF4500",ico:"🔴",desc:"BLAZING HOT"},
+  {id:"fr_cyan",name:"Neon Cyan",price:750,col:"#00E5FF",ico:"🩵",desc:"Electric!"},
+  {id:"fr_purple",name:"Mystic",price:900,col:"#9C27B0",ico:"💜",desc:"Arcane power"},
+  {id:"fr_rainbow",name:"Rainbow",price:1800,col:"rainbow",ico:"🌈",desc:"All the colours!"},
 ];
 
 const UTILS=[
@@ -293,12 +293,19 @@ const resolveChallenge = async (challengeId, receiverUsername, challengerUsernam
   // Remove challenge node
   await fbRef("challenges/" + receiverUsername.toLowerCase() + "/" + challengeId).remove();
   if (accept) {
-    // Deduct coins from challenger, add to receiver
-    const snap = await fbRef("profiles/" + challengerUsername.toLowerCase()).get();
-    if (snap.exists()) {
-      const data = snap.val();
-      const newCoins = Math.max(0, (data.coins || 0) - reward);
-      await fbRef("profiles/" + challengerUsername.toLowerCase() + "/coins").set(newCoins);
+    // Deduct coins from challenger in Firebase
+    const chalSnap = await fbRef("profiles/" + challengerUsername.toLowerCase()).get();
+    if (chalSnap.exists()) {
+      const chalData = chalSnap.val();
+      const newChalCoins = Math.max(0, (chalData.coins || 0) - reward);
+      await fbRef("profiles/" + challengerUsername.toLowerCase() + "/coins").set(newChalCoins);
+    }
+    // Add coins to receiver in Firebase
+    const recSnap = await fbRef("profiles/" + receiverUsername.toLowerCase()).get();
+    if (recSnap.exists()) {
+      const recData = recSnap.val();
+      const newRecCoins = (recData.coins || 0) + reward;
+      await fbRef("profiles/" + receiverUsername.toLowerCase() + "/coins").set(newRecCoins);
     }
   }
 };
