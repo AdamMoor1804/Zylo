@@ -742,11 +742,11 @@ function App(){
   const dailyQuests=getDailyQuests();
   const questsDone=s.dailyQuestDate===tod()?s.dailyQuestsDone:[];
 
-  const checkTierReward=(newXp,prevXp)=>{
+  const checkTierReward=(newXp,prevXp,alreadyClaimed)=>{
     for(const[tier,reward] of Object.entries(TIER_REWARDS)){
       const triggerRank=RANKS.find(r=>r.name===reward.triggerRank);
       if(!triggerRank)continue;
-      if(prevXp<triggerRank.xpReq&&newXp>=triggerRank.xpReq&&!(s.claimedTierRewards||[]).includes(tier)){
+      if(prevXp<triggerRank.xpReq&&newXp>=triggerRank.xpReq&&!(alreadyClaimed||[]).includes(tier)){
         return{tier,reward};
       }
     }
@@ -779,12 +779,15 @@ function App(){
     if(lsd!==today){streak=(lsd===yest()?s.streak+1:1);lsd=today;}
     const tasks=s.dailyTasks.map(t=>t.id===id?{...t,done:true}:t);
     const nb=s.xpBoost>0&&earned>0?s.xpBoost-1:s.xpBoost;
-    const tierRew=checkTierReward(newXp,s.xp);
+    const currentClaimed=s.claimedTierRewards||[];
+    const tierRew=checkTierReward(newXp,s.xp,currentClaimed);
     const patch={dailyTasks:tasks,xp:newXp,streak,lastStreakDate:lsd,totalDone:s.totalDone+1,dailyXpEarned:curXp+earned,dailyXpDate:today,xpBoost:nb};
     if(tierRew){
-      patch.claimedTierRewards=[...(s.claimedTierRewards||[]),tierRew.tier];
-      patch.ownedChar=[...s.ownedChar,tierRew.reward.char.id];
-      patch.ownedBg=[...s.ownedBg,tierRew.reward.bg.id];
+      patch.claimedTierRewards=[...currentClaimed,tierRew.tier];
+      const newOwnedChar=(s.ownedChar||["owl"]).includes(tierRew.reward.char.id)?s.ownedChar:[...(s.ownedChar||["owl"]),tierRew.reward.char.id];
+      const newOwnedBg=(s.ownedBg||[]).includes(tierRew.reward.bg.id)?s.ownedBg:[...(s.ownedBg||[]),tierRew.reward.bg.id];
+      patch.ownedChar=newOwnedChar;
+      patch.ownedBg=newOwnedBg;
     }
     upd(patch);
     setFadingTask(id);
@@ -872,11 +875,48 @@ function App(){
     showToast(`Friend request sent to ${friendResult.displayName||u}! 📨`);
     setFriendSearch("");setFriendResult(null);setFriendSearched(false);
   };
-  const acceptFriend=(requester)=>{
-    clearIncomingRequest(currentUser,requester.username);
+  const acceptFriend=async(requester)=>{
+    // Remove the incoming request node
+    await clearIncomingRequest(currentUser,requester.username);
+
+    // Build my public profile summary to send to them
+    const myEntry={
+      username:currentUser,
+      displayName:s.displayName||currentUser,
+      avatar:s.avatar||"🦉",
+      xp:s.xp||0,
+      streak:s.streak||0,
+      rank:getRank(s.xp||0).name,
+      rankIcon:getRank(s.xp||0).icon,
+      lastSeen:Date.now(),
+    };
+
+    // Add each other to each other's friends list in Firebase
+    const mySnap=await fbRef("profiles/"+currentUser.toLowerCase()).get();
+    if(mySnap.exists()){
+      const myData=mySnap.val();
+      const myFriends=[...(myData.friends||[])];
+      if(!myFriends.find(f=>f.username===requester.username))myFriends.push(requester);
+      await fbRef("profiles/"+currentUser.toLowerCase()+"/friends").set(myFriends);
+    }
+
+    // Add me to the OTHER person's friends list in Firebase
+    const theirSnap=await fbRef("profiles/"+requester.username.toLowerCase()).get();
+    if(theirSnap.exists()){
+      const theirData=theirSnap.val();
+      const theirFriends=[...(theirData.friends||[])];
+      if(!theirFriends.find(f=>f.username===currentUser))theirFriends.push(myEntry);
+      // Also remove me from their pendingRequests
+      const theirPending=(theirData.pendingRequests||[]).filter(r=>r!==currentUser);
+      await fbRef("profiles/"+requester.username.toLowerCase()+"/friends").set(theirFriends);
+      await fbRef("profiles/"+requester.username.toLowerCase()+"/pendingRequests").set(theirPending);
+    }
+
+    // Update local state
     upd({
       friends:[...(s.friends||[]),requester],
-      incomingRequests:(s.incomingRequests||[]).filter(r=>r.username!==requester.username)
+      incomingRequests:(s.incomingRequests||[]).filter(r=>r.username!==requester.username),
+      pendingRequests:(s.pendingRequests||[]).filter(r=>r!==requester.username),
     });
     showToast(`You and ${requester.displayName||requester.username} are now friends! 🎉`);
   };
@@ -888,9 +928,15 @@ function App(){
   const syncRequests=async()=>{
     const fresh=await syncIncomingRequests(currentUser);
     const freshChals=await syncChallenges(currentUser);
+    // Also reload profile from Firebase to get latest friends & pendingRequests
+    const freshProfile=await loadFullProfile(currentUser);
     const patch={};
     if(JSON.stringify(fresh)!==JSON.stringify(s.incomingRequests||[]))patch.incomingRequests=fresh;
     if(JSON.stringify(freshChals)!==JSON.stringify(s.challenges||[]))patch.challenges=freshChals;
+    if(freshProfile){
+      if(JSON.stringify(freshProfile.friends||[])!==JSON.stringify(s.friends||[]))patch.friends=freshProfile.friends||[];
+      if(JSON.stringify(freshProfile.pendingRequests||[])!==JSON.stringify(s.pendingRequests||[]))patch.pendingRequests=freshProfile.pendingRequests||[];
+    }
     if(Object.keys(patch).length>0)upd(patch);
   };
 
@@ -998,7 +1044,21 @@ function App(){
         <div style={{fontSize:13,fontWeight:700,color:"#888",marginBottom:20}}>Are you sure you want to remove <strong style={{color:"#333"}}>{confirmUnfriend}</strong> from your friends?</div>
         <div style={{display:"flex",gap:10}}>
           <button onClick={()=>setConfirmUnfriend(null)} style={{flex:1,padding:"10px",border:"2px solid #E0E0E0",borderRadius:13,fontFamily:"Nunito,sans-serif",fontWeight:800,fontSize:13,background:"#fff",color:"#888",cursor:"pointer"}}>Cancel</button>
-          <button onClick={()=>{upd({friends:s.friends.filter(x=>x.username!==confirmUnfriend)});setConfirmUnfriend(null);showToast("Friend removed");}} style={{flex:1,padding:"10px",border:"none",borderRadius:13,fontFamily:"Nunito,sans-serif",fontWeight:900,fontSize:13,background:"#E53935",color:"#fff",cursor:"pointer"}}>Remove</button>
+          <button onClick={async()=>{
+            // Remove from both sides in Firebase
+            const mySnap=await fbRef("profiles/"+currentUser.toLowerCase()).get();
+            if(mySnap.exists()){
+              const myData=mySnap.val();
+              await fbRef("profiles/"+currentUser.toLowerCase()+"/friends").set((myData.friends||[]).filter(f=>f.username!==confirmUnfriend));
+            }
+            const theirSnap=await fbRef("profiles/"+confirmUnfriend.toLowerCase()).get();
+            if(theirSnap.exists()){
+              const theirData=theirSnap.val();
+              await fbRef("profiles/"+confirmUnfriend.toLowerCase()+"/friends").set((theirData.friends||[]).filter(f=>f.username!==currentUser));
+            }
+            upd({friends:s.friends.filter(x=>x.username!==confirmUnfriend)});
+            setConfirmUnfriend(null);showToast("Friend removed");
+          }} style={{flex:1,padding:"10px",border:"none",borderRadius:13,fontFamily:"Nunito,sans-serif",fontWeight:900,fontSize:13,background:"#E53935",color:"#fff",cursor:"pointer"}}>Remove</button>
         </div>
       </div>
     </div>}
@@ -1246,7 +1306,7 @@ function App(){
           </>}
           <div style={{display:"flex",alignItems:"center",justifyContent:"space-between",marginBottom:10}}>
             <div style={{fontWeight:900,fontSize:14,color:tc}}>👥 Friends ({(s.friends||[]).length})</div>
-            <button onClick={syncRequests} style={{fontSize:10,fontWeight:800,color:"#5FA0E0",background:"#E8F3FF",border:"1.5px solid #A0C8F0",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"Nunito,sans-serif"}}>↻ Check requests</button>
+            <button onClick={syncRequests} style={{fontSize:10,fontWeight:800,color:"#5FA0E0",background:"#E8F3FF",border:"1.5px solid #A0C8F0",borderRadius:8,padding:"4px 10px",cursor:"pointer",fontFamily:"Nunito,sans-serif"}}>↻ Refresh</button>
           </div>
           {(s.friends||[]).length===0
             ?card(<div style={{padding:"2rem 1rem",textAlign:"center"}}><div style={{fontSize:40,marginBottom:8}}>🤝</div><div style={{fontWeight:800,fontSize:14,color:tc2}}>No friends yet!</div><div style={{fontSize:12,color:dk?"#444":"#CCC",fontWeight:600,marginTop:4}}>Search by username above</div></div>)
