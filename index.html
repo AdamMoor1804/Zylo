@@ -156,7 +156,6 @@ const FRAMES=[
 const UTILS=[
   {id:"freeze",name:"Streak Freeze",price:200,ico:"🧊",bg:"#E3F2FD",bdr:"#5FA0E0",desc:"Protect streak 1 day!"},
   {id:"xp_boost",name:"XP Boost",price:300,ico:"⚡",bg:"#FFFDE7",bdr:"#F9A825",desc:"Double XP for 10 tasks!"},
-  {id:"chest_key",name:"Bonus Chest",price:150,ico:"🗝️",bg:"#F3E5F5",bdr:"#AB47BC",desc:"Open extra chest now!"},
   {id:"xp_cap",name:"XP Cap Up",price:400,ico:"📈",bg:"#E8F5E9",bdr:"#43A047",desc:"+50 XP to daily cap!"},
 ];
 
@@ -904,7 +903,7 @@ function App(){
     setConfirmItem(null);setPendingBuy(null);
     if(cat==="util"){
       if(s.coins<item.price){showToast("Not enough coins! 🪙");return;}
-      if(item.id==="chest_key"){const c=100+Math.floor(Math.random()*151);upd({coins:s.coins-item.price+c});setChestOpenData({coins:c,bonus:null});return;}
+
       const patch={coins:s.coins-item.price};
       if(item.id==="freeze")patch.streakFreezes=(s.streakFreezes||0)+1;
       if(item.id==="xp_boost")patch.xpBoost=(s.xpBoost||0)+10;
