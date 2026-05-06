@@ -206,6 +206,22 @@ const hashStr=s=>{let h=0;for(let i=0;i<s.length;i++){h=Math.imul(31,h)+s.charCo
 const seededRand=(seed)=>{let s=seed;return()=>{s=(s*16807+0)%2147483647;return(s-1)/2147483646;};};
 const getDailyQuests=()=>{const d=tod();const r=seededRand(hashStr(d));const shuffled=[...QUEST_POOL].sort(()=>r()-.5);return shuffled.slice(0,3);};
 
+const WEEKLY_QUEST_POOL=[
+  {task:"Complete 20 tasks this week",type:"tasks",target:20,reward:200},
+  {task:"Complete 30 tasks this week",type:"tasks",target:30,reward:300},
+  {task:"Earn 500 XP this week",type:"xp",target:500,reward:250},
+  {task:"Earn 750 XP this week",type:"xp",target:750,reward:350},
+  {task:"Maintain a streak all 7 days",type:"streak",target:7,reward:300},
+  {task:"Complete 5 quests this week",type:"quests",target:5,reward:200},
+  {task:"Complete 10 quests this week",type:"quests",target:10,reward:350},
+  {task:"Complete tasks 5 days in a row",type:"streak",target:5,reward:200},
+  {task:"Earn 1000 XP this week",type:"xp",target:1000,reward:500},
+  {task:"Complete 50 tasks this week",type:"tasks",target:50,reward:500},
+];
+
+const getWeekStart=()=>{const d=new Date();d.setHours(0,0,0,0);d.setDate(d.getDate()-d.getDay());return d.toISOString().split("T")[0];};
+const getWeeklyQuests=()=>{const w=getWeekStart();const r=seededRand(hashStr(w));const shuffled=[...WEEKLY_QUEST_POOL].sort(()=>r()-.5);return shuffled.slice(0,3);};
+
 /* ─── FIREBASE DB HELPERS ─── */
 const fbRef = path => db.ref(path);
 
@@ -335,6 +351,8 @@ const DEF={
   friends:[],pendingRequests:[],incomingRequests:[],challenges:[],
   claimedTierRewards:[],
   dailyQuestDate:"",dailyQuestsDone:[],
+  weeklyQuestsDone:[],weeklyQuestsWeek:"",
+  weeklyTaskCount:0,weeklyXpCount:0,weeklyQuestCount:0,weeklyXpWeek:"",
 };
 
 /* ─── CONFETTI ─── */
@@ -616,6 +634,7 @@ function App(){
   const[confirmItem,setConfirmItem]=useState(null);
   const[pendingBuy,setPendingBuy]=useState(null);
   const[showDuePanel,setShowDuePanel]=useState(false);
+  const[questTab,setQuestTab]=useState("daily");
   const[dueDate,setDueDate]=useState("");
   const[dueTime,setDueTime]=useState("");
   const[sellItem,setSellItem]=useState(null);
@@ -663,6 +682,8 @@ function App(){
     setCurrentUser(username);
     userRef.current=username;
     const merged={...DEF,...userData,username};
+    // One-time coin reset for all accounts
+    if(!merged.coinsReset_v1){merged.coins=0;merged.coinsReset_v1=true;}
     const ownedC=merged.ownedChar||["owl"];
     const safeChar=ownedC.includes(merged.equippedChar)?merged.equippedChar:"owl";
     const freshReqs=await syncIncomingRequests(username);
@@ -787,7 +808,10 @@ function App(){
     const nb=s.xpBoost>0&&earned>0?s.xpBoost-1:s.xpBoost;
     const currentClaimed=s.claimedTierRewards||[];
     const tierRew=checkTierReward(newXp,s.xp,currentClaimed);
-    const patch={dailyTasks:tasks,xp:newXp,streak,lastStreakDate:lsd,totalDone:s.totalDone+1,dailyXpEarned:curXp+earned,dailyXpDate:today,xpBoost:nb};
+    const ws=getWeekStart();
+    const wTaskCount=(s.weeklyXpWeek===ws?s.weeklyTaskCount:0)+1;
+    const wXpCount=(s.weeklyXpWeek===ws?s.weeklyXpCount:0)+earned;
+    const patch={dailyTasks:tasks,xp:newXp,streak,lastStreakDate:lsd,totalDone:s.totalDone+1,dailyXpEarned:curXp+earned,dailyXpDate:today,xpBoost:nb,weeklyTaskCount:wTaskCount,weeklyXpCount:wXpCount,weeklyXpWeek:ws};
     if(tierRew){
       patch.claimedTierRewards=[...currentClaimed,tierRew.tier];
       const newOwnedChar=(s.ownedChar||["owl"]).includes(tierRew.reward.char.id)?s.ownedChar:[...(s.ownedChar||["owl"]),tierRew.reward.char.id];
@@ -817,16 +841,42 @@ function App(){
     if(newDone.includes(idx))return;
     newDone.push(idx);
     const coins=s.coins+25;
-    upd({dailyQuestDate:tod(),dailyQuestsDone:newDone,coins});
+    const wqCount=(s.weeklyQuestsWeek===getWeekStart()?s.weeklyQuestCount:0)+1;
+    upd({dailyQuestDate:tod(),dailyQuestsDone:newDone,coins,weeklyQuestsDone:s.weeklyQuestsDone,weeklyQuestCount:wqCount,weeklyQuestsWeek:getWeekStart()});
     showToast("+25 coins! 🪙 Quest complete!");
+  };
+
+  const weeklyQuests=getWeeklyQuests();
+  const weekStart=getWeekStart();
+  const weeklyDone=s.weeklyQuestsWeek===weekStart?s.weeklyQuestsDone:[];
+  const weeklyTaskCount=s.weeklyXpWeek===weekStart?s.weeklyTaskCount:0;
+  const weeklyXpCount=s.weeklyXpWeek===weekStart?s.weeklyXpCount:0;
+  const weeklyQuestCount=s.weeklyQuestsWeek===weekStart?s.weeklyQuestCount:0;
+
+  const getWeeklyProgress=(quest)=>{
+    if(quest.type==="tasks")return{current:weeklyTaskCount,target:quest.target};
+    if(quest.type==="xp")return{current:weeklyXpCount,target:quest.target};
+    if(quest.type==="quests")return{current:weeklyQuestCount,target:quest.target};
+    if(quest.type==="streak")return{current:s.streak,target:quest.target};
+    return{current:0,target:quest.target};
+  };
+
+  const claimWeeklyQuest=(idx)=>{
+    if(weeklyDone.includes(idx))return;
+    const quest=weeklyQuests[idx];
+    const prog=getWeeklyProgress(quest);
+    if(prog.current<prog.target){showToast("Not done yet! Keep going 💪");return;}
+    const newDone=[...weeklyDone,idx];
+    upd({weeklyQuestsDone:newDone,weeklyQuestsWeek:weekStart,coins:s.coins+quest.reward});
+    showToast(`+🪙${quest.reward} coins! Weekly quest complete! 🎉`);
   };
 
   const openChest=()=>{
     if(!chestAvail){showToast("Come back tomorrow! 📦");return;}
-    const coins=50+Math.floor(Math.random()*101);
+    const coins=20+Math.floor(Math.random()*41);
     const roll=Math.random();
     let bonus=null;
-    if(roll<.10)bonus="freeze";else if(roll<.18)bonus="xp_boost";else if(roll<.23)bonus="chest_key";else if(roll<.27)bonus="xp_cap";
+    if(roll<.04)bonus="freeze";else if(roll<.07)bonus="xp_boost";else if(roll<.09)bonus="chest_key";else if(roll<.10)bonus="xp_cap";
     const patch={coins:s.coins+coins,lastChestDate:tod()};
     if(bonus==="freeze")patch.streakFreezes=(s.streakFreezes||0)+1;
     if(bonus==="xp_boost")patch.xpBoost=(s.xpBoost||0)+10;
@@ -1249,27 +1299,67 @@ function App(){
         </>}
 
         {tab==="quests"&&<>
-          <div style={{fontWeight:900,fontSize:16,color:tc,marginBottom:12}}>🎯 Daily Quests</div>
-          <div style={{background:dk?"#1A1A28":"#EAF3FF",border:`2px solid ${cardBdr}`,borderRadius:18,padding:"11px 14px",marginBottom:12,fontSize:12,fontWeight:700,color:tk=>"#5FA0E0"}}>
-            <span style={{color:"#5FA0E0",fontSize:13}}>ℹ️</span> Complete daily quests to earn extra coins! Quests refresh every day.
+          <div style={{fontWeight:900,fontSize:16,color:tc,marginBottom:10}}>🎯 Quests</div>
+          {/* Tab switcher */}
+          <div style={{display:"flex",gap:6,marginBottom:12}}>
+            {[{id:"daily",l:"📅 Daily"},{id:"weekly",l:"📆 Weekly"}].map(t=><button key={t.id} onClick={()=>setQuestTab(t.id)} style={{flex:1,padding:"9px",border:`2px solid ${questTab===t.id?"#5FA0E0":"#E0EAFA"}`,borderRadius:14,fontFamily:"Nunito,sans-serif",fontSize:12,fontWeight:800,cursor:"pointer",color:questTab===t.id?"#5FA0E0":tc2,background:questTab===t.id?(dk?"#1A2030":"#E8F3FF"):(dk?"#16162A":"#FAFCFF")}}>{t.l}</button>)}
           </div>
-          {dailyQuests.map((q,i)=>{
-            const done=questsDone.includes(i);
-            return <div key={i} style={{background:cardBg,border:`2px solid ${done?"#A0C8F0":cardBdr}`,borderRadius:18,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12,transition:"all .2s"}}>
-              <div style={{width:40,height:40,borderRadius:12,background:done?"#E8F3FF":"#F4F8FF",border:`2px solid ${done?"#5FA0E0":"#D0E4F5"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{done?"✅":"🎯"}</div>
-              <div style={{flex:1}}>
-                <div style={{fontWeight:800,fontSize:13,color:done?tc2:tc,textDecoration:done?"line-through":"none"}}>{q}</div>
-                <div style={{fontSize:11,fontWeight:700,color:"#F9A825",marginTop:2}}>+25 🪙 coins</div>
-              </div>
-              {!done?<button onClick={()=>completeQuest(i)} style={{background:"#5FA0E0",border:"none",borderRadius:11,padding:"7px 14px",fontFamily:"Nunito,sans-serif",fontWeight:800,fontSize:11,color:"#fff",cursor:"pointer",boxShadow:"0 2px 0 #4A8CC8",flexShrink:0}}>Done!</button>:<span style={{fontSize:13,fontWeight:800,color:"#5FA0E0",flexShrink:0}}>✓</span>}
-            </div>;
-          })}
-          <div style={{background:dk?"#1A1A28":"#F4F8FF",border:`2px solid ${cardBdr}`,borderRadius:18,padding:"14px 16px",textAlign:"center",marginTop:4}}>
-            <div style={{fontSize:20,marginBottom:6}}>💰</div>
-            <div style={{fontWeight:800,fontSize:13,color:tc}}>Quest Earnings Today</div>
-            <div style={{fontSize:22,fontWeight:900,color:"#F9A825",marginTop:4}}>+{questsDone.length*25} 🪙</div>
-            <div style={{fontSize:11,color:tc2,fontWeight:600,marginTop:2}}>{questsDone.length}/3 quests complete</div>
-          </div>
+
+          {questTab==="daily"&&<>
+            <div style={{background:dk?"#1A1A28":"#EAF3FF",border:`2px solid ${cardBdr}`,borderRadius:16,padding:"10px 14px",marginBottom:12,fontSize:11,fontWeight:700,color:"#5FA0E0"}}>
+              🎯 Complete 3 daily quests for +25 🪙 each · Refresh every midnight
+            </div>
+            {dailyQuests.map((q,i)=>{
+              const done=questsDone.includes(i);
+              return <div key={i} style={{background:cardBg,border:`2px solid ${done?"#A0C8F0":cardBdr}`,borderRadius:18,padding:"14px 16px",marginBottom:10,display:"flex",alignItems:"center",gap:12}}>
+                <div style={{width:40,height:40,borderRadius:12,background:done?"#E8F3FF":"#F4F8FF",border:`2px solid ${done?"#5FA0E0":"#D0E4F5"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{done?"✅":"🎯"}</div>
+                <div style={{flex:1}}>
+                  <div style={{fontWeight:800,fontSize:13,color:done?tc2:tc,textDecoration:done?"line-through":"none"}}>{q}</div>
+                  <div style={{fontSize:11,fontWeight:700,color:"#F9A825",marginTop:2}}>+25 🪙 coins</div>
+                </div>
+                {!done?<button onClick={()=>completeQuest(i)} style={{background:"#5FA0E0",border:"none",borderRadius:11,padding:"7px 14px",fontFamily:"Nunito,sans-serif",fontWeight:800,fontSize:11,color:"#fff",cursor:"pointer",boxShadow:"0 2px 0 #4A8CC8",flexShrink:0}}>Done!</button>:<span style={{fontSize:13,fontWeight:800,color:"#5FA0E0",flexShrink:0}}>✓</span>}
+              </div>;
+            })}
+            <div style={{background:dk?"#1A1A28":"#F4F8FF",border:`2px solid ${cardBdr}`,borderRadius:18,padding:"14px 16px",textAlign:"center"}}>
+              <div style={{fontWeight:800,fontSize:13,color:tc}}>Today's Earnings</div>
+              <div style={{fontSize:22,fontWeight:900,color:"#F9A825",marginTop:4}}>+{questsDone.length*25} 🪙</div>
+              <div style={{fontSize:11,color:tc2,fontWeight:600,marginTop:2}}>{questsDone.length}/3 complete</div>
+            </div>
+          </>}
+
+          {questTab==="weekly"&&<>
+            <div style={{background:dk?"#1A1A28":"#FFF8E8",border:"2px solid #FFCC80",borderRadius:16,padding:"10px 14px",marginBottom:12,fontSize:11,fontWeight:700,color:"#E65100"}}>
+              📆 Big weekly challenges for big rewards · Refresh every Monday
+            </div>
+            {weeklyQuests.map((q,i)=>{
+              const done=weeklyDone.includes(i);
+              const prog=getWeeklyProgress(q);
+              const pct=Math.min(100,Math.round(prog.current/prog.target*100));
+              return <div key={i} style={{background:cardBg,border:`2px solid ${done?"#FFCC80":cardBdr}`,borderRadius:18,padding:"14px 16px",marginBottom:10}}>
+                <div style={{display:"flex",alignItems:"center",gap:12,marginBottom:8}}>
+                  <div style={{width:40,height:40,borderRadius:12,background:done?"#FFF3E0":"#F4F8FF",border:`2px solid ${done?"#F9A825":"#D0E4F5"}`,display:"flex",alignItems:"center",justifyContent:"center",fontSize:20,flexShrink:0}}>{done?"🏆":"📆"}</div>
+                  <div style={{flex:1}}>
+                    <div style={{fontWeight:800,fontSize:13,color:done?tc2:tc,textDecoration:done?"line-through":"none"}}>{q.task}</div>
+                    <div style={{fontSize:11,fontWeight:700,color:"#F9A825",marginTop:2}}>+{q.reward} 🪙 coins</div>
+                  </div>
+                  {done?<span style={{fontSize:13,fontWeight:800,color:"#F9A825",flexShrink:0}}>✓</span>
+                    :pct>=100?<button onClick={()=>claimWeeklyQuest(i)} style={{background:"#F9A825",border:"none",borderRadius:11,padding:"7px 12px",fontFamily:"Nunito,sans-serif",fontWeight:800,fontSize:11,color:"#fff",cursor:"pointer",boxShadow:"0 2px 0 #E09000",flexShrink:0}}>Claim!</button>
+                    :<span style={{fontSize:11,fontWeight:700,color:tc2,flexShrink:0}}>{prog.current}/{prog.target}</span>}
+                </div>
+                {!done&&<div>
+                  <div style={{height:8,background:dk?"#1E1E32":"#F0F0F0",borderRadius:6,overflow:"hidden"}}>
+                    <div style={{height:"100%",width:`${pct}%`,background:"linear-gradient(90deg,#F9A825,#FF8C00)",borderRadius:6,transition:"width .4s"}}/>
+                  </div>
+                  <div style={{fontSize:9,fontWeight:700,color:tc2,marginTop:3,textAlign:"right"}}>{pct}% complete</div>
+                </div>}
+              </div>;
+            })}
+            <div style={{background:dk?"#1A1A28":"#FFF8E8",border:"2px solid #FFCC80",borderRadius:18,padding:"14px 16px",textAlign:"center"}}>
+              <div style={{fontWeight:800,fontSize:13,color:tc}}>Weekly Earnings</div>
+              <div style={{fontSize:22,fontWeight:900,color:"#F9A825",marginTop:4}}>+{weeklyDone.length>0?weeklyQuests.filter((_,i)=>weeklyDone.includes(i)).reduce((a,q)=>a+q.reward,0):0} 🪙</div>
+              <div style={{fontSize:11,color:tc2,fontWeight:600,marginTop:2}}>{weeklyDone.length}/3 complete</div>
+            </div>
+          </>}
         </>}
 
         {tab==="friends"&&<>
