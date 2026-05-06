@@ -1045,7 +1045,7 @@ function App(){
         <div style={{fontSize:11,fontWeight:600,color:"#BBB",marginBottom:18}}>(50% of original price)</div>
         <div style={{display:"flex",gap:10}}>
           <button onClick={()=>setSellItem(null)} style={{flex:1,padding:"10px",border:"2px solid #E0E0E0",borderRadius:13,fontFamily:"Nunito,sans-serif",fontWeight:800,fontSize:13,background:"#fff",color:"#888",cursor:"pointer"}}>Cancel</button>
-          <button onClick={()=>{
+          <button onClick={async()=>{
             const{item,cat}=sellItem;
             const refund=Math.floor(item.price*0.5);
             const OK={chars:"ownedChar",bgs:"ownedBg",frames:"ownedFrame"};
@@ -1053,7 +1053,11 @@ function App(){
             const newOwned=(s[OK[cat]]||[]).filter(id=>id!==item.id);
             const patch={coins:s.coins+refund,[OK[cat]]:newOwned};
             if(s[EK[cat]]===item.id){const fallback=cat==="chars"?"owl":cat==="bgs"?"bg_light":"fr_none";patch[EK[cat]]=fallback;}
-            upd(patch);setSellItem(null);showToast(`Sold ${item.name} for 🪙 ${refund}!`);
+            upd(patch);
+            // Save to Firebase immediately so item is removed on all devices
+            const updatedProfile={...s,...patch};
+            await saveFullProfile(currentUser,updatedProfile);
+            setSellItem(null);showToast(`Sold ${item.name} for 🪙 ${refund}!`);
           }} style={{flex:1,padding:"10px",border:"none",borderRadius:13,fontFamily:"Nunito,sans-serif",fontWeight:900,fontSize:13,background:"#E53935",color:"#fff",cursor:"pointer"}}>Sell</button>
         </div>
       </div>
